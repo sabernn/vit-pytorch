@@ -42,7 +42,7 @@ def position_encoding(
 ) -> torch.Tensor:
     pos=torch.arange(seq_len, dtype=torch.float, device=device).reshape(1,-1,1)
     dim = torch.arange(dim_model, dtype=torch.float, device=device).reshape(1,1,-1)
-    phase = pos / 1e4 ** (dim // dim_model)
+    phase = pos / 1e4 ** (dim / dim_model)
 
     return torch.where(dim.long() % 2 == 0, torch.sin(phase), torch.cos(phase))
 
@@ -106,7 +106,9 @@ class TransformerEncoder(nn.Module):
 
     def forward(self, src: torch.Tensor) -> torch.Tensor:
         seq_len, dimension = src.size(1), src.size(2)
-        src += position_encoding(seq_len, dimension)
+        pe = position_encoding(seq_len, dimension)
+        plt.imshow(pe[0,:,0:30])
+        src += pe
         for layer in self.layers:
             src = layer(src)
 
@@ -224,12 +226,12 @@ img=imread('zeiss.tiff')
 
 query=torch.rand([batch_size,seq_length,num_features],dtype=torch.float)
 key=torch.randn([batch_size,seq_length,num_features],dtype=torch.float)
-value=torch.ones([batch_size,seq_length,num_features],dtype=torch.float)
+value=torch.rand([batch_size,seq_length,num_features],dtype=torch.float)
 
 img_tensor=torch.unsqueeze(torch.tensor(img[:,:,0],dtype=torch.float),0)
 # torch.unsqueeze(img_tensor)
 
-atten=scaled_dot_product_attention(query,key,img_tensor)
+atten=scaled_dot_product_attention(img_tensor,key,value)
 print(atten.shape)
 
 fig = plt.figure()
@@ -238,5 +240,7 @@ imshow(img)
 fig.add_subplot(1, 2, 2)
 imshow(atten[0].numpy())
 plt.show()
+
+
 
 print("done!")
