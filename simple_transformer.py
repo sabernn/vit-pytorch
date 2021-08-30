@@ -6,13 +6,11 @@ import torch.nn.functional as F
 from skimage.io import imread, imshow
 import matplotlib.pyplot as plt
 
-
 def scaled_dot_product_attention(query: torch.Tensor, key: torch.Tensor, value: torch.Tensor) -> Tensor:
     temp=query.bmm(key.transpose(1,2))
     scale=query.size(-1) ** 0.5
     softmax = F.softmax(temp / scale, dim=-1)
     return softmax.bmm(value)
-
 
 class AttentionHead(nn.Module):
     def __init__(self,dim_in: int, dim_k: int, dim_v: int):
