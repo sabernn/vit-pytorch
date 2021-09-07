@@ -201,10 +201,12 @@ class DataGenerator(DataGeneratorBase):
         for i in range(n_faults):
             imgs,_,_,L=self.input_data(self.categories[i+1],stage=stage,n_patches=n_patches,patch_size=patch_size,aug_mode=aug_mode,plot=False)
             faults.append((imgs,L))
+            
+
         IMGs=np.concatenate((faults[0][0],faults[1][0]),axis=0)
         LBLs=faults[0][1]+faults[1][1]
         print("stay here...")
-        return IMGs
+        return IMGs,LBLs
 
 
 
