@@ -2,6 +2,7 @@
 from numpy import dtype
 import torch
 import torch.nn.functional as F
+import torch.optim as optim
 from vit_pytorch import ViT
 from skimage.io import imread, imshow
 from utils import *
@@ -23,13 +24,13 @@ X_train,Y_train,n_patches,_ = data.input_data(args['class'],
                                         n_patches=n_patches,
                                         patch_size=patch_size,
                                         aug_mode=args['aug_mode'],
-                                        plot=True)
+                                        plot=False)
 X_test,Y_test,_,_ = data.input_data(args['class'],
                                         'test',
                                         n_patches=n_patches_test,
                                         patch_size=patch_size,
                                         aug_mode=args['aug_mode'],
-                                        plot=True)
+                                        plot=False)
 
 X_lbl = data.label_maker(stage='train',
                         n_patches=n_patches,
@@ -64,15 +65,29 @@ for i in range(len(lbl)):
         target[i,0]=1
 
 target=torch.tensor(target)
+target1=target.squeeze(-1).long()
 
 
-preds = torch.argmax(F.softmax(v(img),dim=1),dim=1).unsqueeze(-1)
-preds = preds.float()
 
-loss_func=torch.nn.CrossEntropyLoss()
-loss=loss_func(preds,target)
+# preds = preds.float()
+
+criterion=torch.nn.CrossEntropyLoss()
+optimizer = optim.SGD(v.parameters(), lr=0.001, momentum=0.9)
+
+running_loss = 0.0
+for epoch in range(20):
+    optimizer.zero_grad()
+    
+    preds = F.softmax(v(img),dim=1).float()
+    loss=criterion(preds,target1)
+    loss.backward()
+    optimizer.step()
+
+    running_loss += loss.item()
+    print('[%d] loss: %.3f' % (epoch + 1, running_loss))
+    running_loss = 0
 
 
-print(preds)
+# print(loss)
 
 print("Done!")
