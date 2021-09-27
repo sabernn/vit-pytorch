@@ -85,7 +85,7 @@ class DataGenerator(DataGeneratorBase):
         return height,width
 
 
-    def input_data(self,fault,stage='train',n_patches=100,patch_size=256,aug_mode='random_patches',plot=True):
+    def input_data(self,fault,stage='train',n_patches=100,patch_size=32,aug_mode='regular',plot=True):
         super().input_data()
             
         try:
@@ -195,57 +195,65 @@ class DataGenerator(DataGeneratorBase):
 
         return X,Y,count,L
 
-    def label_maker(self,stage='train',n_patches=100,patch_size=256,aug_mode='regular'): # no idea for random mode yet!
+    def label_maker(self,stage='train',n_patches=100,patch_size=32,aug_mode='regular'): # no idea for random mode yet!
         n_classes=len(self.categories)
         n_faults=n_classes-1 # excluding the original image
         n_labels=2**n_faults-1 # all subsets of n_faults minus the null subset
-        faults=[]
+        labeled_data=[]
         for i in range(n_faults):
             imgs,_,_,L=self.input_data(self.categories[i+1],stage=stage,n_patches=n_patches,patch_size=patch_size,aug_mode=aug_mode,plot=False)
-            faults.append((imgs,L))
+            J = imgs.shape[0]
+            lbl = L[0]
+            for j in range(J):
+                labeled_data.append([imgs[j],lbl])
+            # faults.append((imgs,L))
             
 
-        IMGs=np.concatenate((faults[0][0],faults[1][0]),axis=0)
-        LBLs=faults[0][1]+faults[1][1]
-        print("stay here...")
-        return IMGs,LBLs
+        # IMGs=np.concatenate((faults[0][0],faults[1][0]),axis=0)
+        # LBLs=faults[0][1]+faults[1][1]
+        # print("stay here...")
+        # return IMGs,LBLs
+        return labeled_data
 
     def toTorchDataset(self, is_train):
         dataset = DataGeneratorTorchFromLamda(self,is_train)
-
+        
         return dataset
 
 
 class DataGeneratorTorchFromLamda(Dataset):
-    def __init__(self,lamda_dataset: DataGenerator, is_train: bool) -> None:
+    def __init__(self,lamda_dataset: DataGenerator, is_train) -> None:
         if is_train:
             self.imgs_path = lamda_dataset.TRAIN_DIR
         else:
             self.imgs_path = lamda_dataset.TEST_DIR
-        file_list = glob.glob(self.imgs_path + "/*")
-        print(file_list)
-        self.data = []
-        for class_path in file_list:
-            class_name = class_path.split("\\")[-1]
-            for img_path in glob.glob(class_path + "/*.tiff"):
-                self.data.append([img_path, class_name])
-            print(self.data)
-            keys = lamda_dataset.categories[1:]
-            values = list(range(0, len(keys)))
-            self.class_map = {}
-            self.class_map[keys]=values
-            self.img_dim = (lamda_dataset.IMG_WIDTH,lamda_dataset.IMG_HEIGHT)
+        # file_list = glob.glob(self.imgs_path + "/*")
+        # print(file_list)
+        # self.data = []
+        self.data = lamda_dataset.label_maker()
+        # for class_path in file_list:
+            # class_name = class_path.split("\\")[-1]
+            # for img_path in glob.glob(class_path + "/*.tiff"):
+                # self.data.append([img_path, class_name])
+            # print(self.data)
+        self.class_map = {}
+        for i,keys in enumerate(lamda_dataset.categories[1:]):
+            self.class_map[keys] = i
+        
+        self.img_dim = (lamda_dataset.args['patch_size'],lamda_dataset.args['patch_size'])
 
     def __len__(self):
         return len(self.data)
 
 
     def __getitem__(self, index):
-        img_path, class_name = self.data[index]
-        img = imread(img_path)
+        # img_path, class_name = self.data[index]
+        # img = imread(img_path)
+        img, class_name = self.data[index]
         class_id = self.class_map[class_name]
-        img_tensor = torch.from_numpy(img)
-        class_id = torch.tensor([class_id])
+        img_tensor = torch.from_numpy(img).float()
+        img_tensor = img_tensor.permute(2, 0, 1)
+        class_id = torch.tensor([class_id]).squeeze(-1)
         return img_tensor, class_id
 
 
@@ -273,6 +281,7 @@ class DataGeneratorTorch(Dataset):
         class_id = self.class_map[class_name]
         img_tensor = torch.from_numpy(img)
         class_id = torch.tensor([class_id])
+        # class_id = class_id.squeeze(-1).squeeze(-1)
         return img_tensor, class_id
 
 
@@ -344,12 +353,16 @@ def get_flops():
 
 if __name__ == "__main__":
     from configs import InputParser
-    # dataset = DataGeneratorTorch()
-    # data_loader = DataLoader(dataset, batch_size=4, shuffle=True)
+    dataset = DataGeneratorTorch()
+    data_loader = DataLoader(dataset, batch_size=4, shuffle=True)
     args = InputParser()
     data = DataGenerator(args)
 
+    training_data_single = data.input_data('cracks','train',plot=False)
+    training_data_all = data.label_maker()
+
     dataTorch = data.toTorchDataset(is_train=True)
+    data_loader_lmd = DataLoader(dataTorch, batch_size=4, shuffle=True)
 
     print("Done")
     
