@@ -21,12 +21,13 @@ batch_size=4
 args = InputParser()
 torch.backends.cudnn.benchmark = True
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+print(device)
 n_patches = args['n_patches']
 n_patches_test = args['n_patches_test']
 patch_size = args['patch_size']
 IMG_CHANNELS = 1
 dataset = args['dataset']
-vit_patch=16
+vit_patch=2
 
 trainset = torchvision.datasets.CIFAR10(root='./resources/cifar10', train= True,
                                         download=True)
@@ -41,7 +42,7 @@ X_train,Y_train,n_patches,_ = data.input_data(args['class'],
                                         n_patches=n_patches,
                                         patch_size=patch_size,
                                         aug_mode=args['aug_mode'],
-                                        plot=False)
+                                        plot=True)
 X_test,Y_test,_,_ = data.input_data(args['class'],
                                         'test',
                                         n_patches=n_patches_test,
@@ -123,7 +124,8 @@ optimizer = optim.SGD(v.parameters(), lr=0.001, momentum=0.9)
 
 running_loss = 0.0
 # running_loss2 = 0.0
-for epoch in range(5):
+for epoch in range(20):
+
     optimizer.zero_grad()
     
     preds = F.softmax(v(img),dim=1).float()

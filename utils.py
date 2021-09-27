@@ -5,6 +5,9 @@ import random
 import numpy as np
 import matplotlib.patches as patches
 import os
+from torch.utils.data import Dataset, DataLoader
+import torch
+import glob
 
 class DataGeneratorBase(ABC):
     @abstractmethod
@@ -45,7 +48,6 @@ class DataGenerator(DataGeneratorBase):
         self.rnd_seed=args['rnd_seed']
         self.args=args
         
-
 
     def show_data(self,stage='train'):
         titles=list(map(lambda x: x.capitalize(), self.categories))
@@ -208,6 +210,71 @@ class DataGenerator(DataGeneratorBase):
         print("stay here...")
         return IMGs,LBLs
 
+    def toTorchDataset(self, is_train):
+        dataset = DataGeneratorTorchFromLamda(self,is_train)
+
+        return dataset
+
+
+class DataGeneratorTorchFromLamda(Dataset):
+    def __init__(self,lamda_dataset: DataGenerator, is_train: bool) -> None:
+        if is_train:
+            self.imgs_path = lamda_dataset.TRAIN_DIR
+        else:
+            self.imgs_path = lamda_dataset.TEST_DIR
+        file_list = glob.glob(self.imgs_path + "/*")
+        print(file_list)
+        self.data = []
+        for class_path in file_list:
+            class_name = class_path.split("\\")[-1]
+            for img_path in glob.glob(class_path + "/*.tiff"):
+                self.data.append([img_path, class_name])
+            print(self.data)
+            keys = lamda_dataset.categories[1:]
+            values = list(range(0, len(keys)))
+            self.class_map = {}
+            self.class_map[keys]=values
+            self.img_dim = (lamda_dataset.IMG_WIDTH,lamda_dataset.IMG_HEIGHT)
+
+    def __len__(self):
+        return len(self.data)
+
+
+    def __getitem__(self, index):
+        img_path, class_name = self.data[index]
+        img = imread(img_path)
+        class_id = self.class_map[class_name]
+        img_tensor = torch.from_numpy(img)
+        class_id = torch.tensor([class_id])
+        return img_tensor, class_id
+
+
+class DataGeneratorTorch(Dataset):
+    def __init__(self,DIR="resources/zeiss/train/") -> None:
+        self.imgs_path = DIR
+        file_list = glob.glob(self.imgs_path + "*")
+        print(file_list)
+        self.data = []
+        for class_path in file_list:
+            class_name = class_path.split("\\")[-1]
+            for img_path in glob.glob(class_path + "/*.tiff"):
+                self.data.append([img_path, class_name])
+            print(self.data)
+            self.class_map = {"orig" : 0, "pores": 1, "cracks": 2}
+            self.img_dim = (2000,2000)
+
+    def __len__(self):
+        return len(self.data)
+
+
+    def __getitem__(self, index):
+        img_path, class_name = self.data[index]
+        img = imread(img_path)
+        class_id = self.class_map[class_name]
+        img_tensor = torch.from_numpy(img)
+        class_id = torch.tensor([class_id])
+        return img_tensor, class_id
+
 
 
 def show_data(dataset='zeiss',stage='train',plot=True):
@@ -275,3 +342,14 @@ def get_flops():
             print('TF stats gives',flops.total_float_ops)
 
 
+if __name__ == "__main__":
+    from configs import InputParser
+    # dataset = DataGeneratorTorch()
+    # data_loader = DataLoader(dataset, batch_size=4, shuffle=True)
+    args = InputParser()
+    data = DataGenerator(args)
+
+    dataTorch = data.toTorchDataset(is_train=True)
+
+    print("Done")
+    
